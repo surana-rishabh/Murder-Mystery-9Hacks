@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { io } from 'socket.io-client';
 import './Lobby.css';
 
-const socket = io('http://localhost:3001');
+const socket = io('https://murder-mystery-9hacks-production.up.railway.app/');
 
 function Lobby({ onJoinGame }) {
   const [username, setUsername] = useState('');

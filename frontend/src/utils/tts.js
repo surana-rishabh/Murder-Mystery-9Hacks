@@ -36,7 +36,7 @@ export async function playTTS(text, options = {}) {
   };
 
   try {
-    const response = await fetch('http://localhost:3001/tts', {
+    const response = await fetch('https://murder-mystery-9hacks-production.up.railway.app//tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
