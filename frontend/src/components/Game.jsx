@@ -25,7 +25,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
   const [gameStarted, setGameStarted] = useState(false);
   const [accusatoryMode, setAccusatoryMode] = useState(false);
   const [showMap, setShowMap] = useState(false);
-  const [accusationCount, setAccusationCount] = useState(0);
+  const [accusationsRemaining, setAccusationsRemaining] = useState(2);
   const [players, setPlayers] = useState({});
   const [waitingForPlayers, setWaitingForPlayers] = useState(true);
   const [activeNPC, setActiveNPC] = useState(null);
@@ -82,6 +82,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
       const inv = room.sharedInventory || [];
       setInventory(inv);
       setEvidenceFound(room.evidenceFound || []);
+      setAccusationsRemaining(typeof room.accusationsRemaining === 'number' ? room.accusationsRemaining : 2);
       if (room.murderCase) {
         setMurderCase(room.murderCase);
         setSuspects(room.murderCase.suspects || []);
@@ -145,6 +146,13 @@ function Game({ roomCode, username, isHost, onLeave }) {
       showNotification(won ? '🎉 CASE SOLVED!' : '❌ Wrong accusation!');
     });
 
+    socket.on('accusationUpdate', ({ remaining, accused, accuser }) => {
+      if (typeof remaining === 'number') {
+        setAccusationsRemaining(remaining);
+      }
+      showNotification(`${accuser} accused ${accused}. Attempts left: ${remaining}`);
+    });
+
     socket.on('evidenceCollected', ({ evidenceName, collectedBy, totalEvidence }) => {
       console.log(`📋 Evidence collected: ${evidenceName} by ${collectedBy}`);
       setEvidenceFound(prev => (prev.includes(evidenceName) ? prev : [...prev, evidenceName]));
@@ -154,6 +162,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
     socket.on('roomJoined', ({ roomCode, room }) => {
       setPlayers(room.players);
       setEvidenceFound(room.evidenceFound || []);
+      setAccusationsRemaining(typeof room.accusationsRemaining === 'number' ? room.accusationsRemaining : 2);
       if (room.gameStarted) {
         setGameStarted(true);
         if (room.murderCase) {
@@ -174,6 +183,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
       socket.off('itemReceived');
       socket.off('gameOver');
       socket.off('caseResolved');
+      socket.off('accusationUpdate');
       socket.off('evidenceCollected');
     };
   }, []);
@@ -248,6 +258,11 @@ function Game({ roomCode, username, isHost, onLeave }) {
       return;
     }
 
+    if (accusationsRemaining <= 0) {
+      showNotification('No accusations remaining');
+      return;
+    }
+
     console.log(`🔍 Player accusing ${suspectName}`);
     socket.emit('accuseSuspect', { roomCode, suspectName });
   };
@@ -316,10 +331,10 @@ function Game({ roomCode, username, isHost, onLeave }) {
     const state = gameStateRef.current;
 
     const mapImage = new Image();
-    mapImage.src = '/img/calhacks-map.png';
+    mapImage.src = '/img/kajukatli-map.png';
     
     const foregroundImage = new Image();
-    foregroundImage.src = '/img/calhacks-map-foreground.png';
+    foregroundImage.src = '/img/kajukatli-map-foreground.png';
     
     const playerImage = new Image();
     playerImage.src = '/img/ninja.png';
@@ -906,7 +921,7 @@ ${gameOver.victim} was killed via ${murderCase?.weapon || 'unknown method'} in $
               <li className="briefing-step">1. Interrogate the suspects scattered across the map</li>
               <li className="briefing-step">2. Collect evidence clues - press E when near glowing items</li>
               <li className="briefing-step">3. Accuse the killer using the Accuse button</li>
-              <li className="briefing-step">4. You have 3 accusations - choose wisely</li>
+              <li className="briefing-step">4. You have 2 accusations - choose wisely</li>
             </ul>
           </div>
 
@@ -979,8 +994,8 @@ ${gameOver.victim} was killed via ${murderCase?.weapon || 'unknown method'} in $
 
         <div className="hud-right">
           <div className="hud-attempts">
-            {[...Array(3)].map((_, i) => (
-              <span key={i} style={{ color: i < (3 - accusationCount) ? '#f4d03f' : '#222' }}>◆</span>
+            {[...Array(2)].map((_, i) => (
+              <span key={i} style={{ color: i < accusationsRemaining ? '#f4d03f' : '#222' }}>◆</span>
             ))}
           </div>
           <button className="btn-hud btn-accuse-main" onClick={() => setAccusatoryMode(true)}>
@@ -1024,7 +1039,7 @@ ${gameOver.victim} was killed via ${murderCase?.weapon || 'unknown method'} in $
           <div className="accusation-container" style={{ background: '#1a1d23', border: '1px solid #ff1744', padding: '40px', width: '450px', textAlign: 'center' }}>
             <h2 style={{ color: '#ff1744', fontSize: '2rem', marginBottom: '10px', fontFamily: 'Crimson Pro, serif' }}>Make Your Accusation</h2>
             <p style={{ color: '#aaa', marginBottom: '30px', fontSize: '14px' }}>
-              Choose wisely. You have <span style={{ color: '#f4d03f', fontWeight: 'bold' }}>{3 - accusationCount} attempts</span> remaining.
+              Choose wisely. You have <span style={{ color: '#f4d03f', fontWeight: 'bold' }}>{accusationsRemaining} attempts</span> remaining.
             </p>
             
             <div className="suspect-grid" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

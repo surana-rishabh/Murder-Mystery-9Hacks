@@ -409,7 +409,8 @@ io.on('connection', (socket) => {
       murderCase: null,
       investigationStatus: 'pending',
       evidenceFound: [],
-      accusation: null
+      accusation: null,
+      accusationsRemaining: 2
     };
 
     room.playerChat = [];
@@ -538,6 +539,7 @@ io.on('connection', (socket) => {
     console.log(`🎭 Created ${Object.keys(room.npcs).length} suspects for investigation`);
 
     room.gameStarted = true;
+    room.accusationsRemaining = 2;
     io.to(roomCode).emit('gameStarted', { room });
     io.to(roomCode).emit('caseGenerated', { murderCase });
     console.log(`Game started in room ${roomCode}`);
@@ -713,6 +715,15 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (typeof room.accusationsRemaining !== 'number') {
+      room.accusationsRemaining = 2;
+    }
+
+    if (room.accusationsRemaining <= 0) {
+      socket.emit('error', { message: 'No accusations remaining' });
+      return;
+    }
+
     // Check if accusation is correct
     const isCorrect = suspectName === room.murderCase.killer;
 
@@ -724,25 +735,52 @@ io.on('connection', (socket) => {
       timestamp: Date.now()
     };
 
-    // Create game over event
+    if (isCorrect) {
+      const gameOverData = {
+        won: true,
+        correctly_accused: true,
+        actual_killer: room.murderCase.killer,
+        accused: suspectName,
+        victim: room.murderCase.victim,
+        accuser: player.username
+      };
+
+      room.investigationStatus = 'concluded';
+      room.gameWon = true;
+      room.gameLost = false;
+
+      io.to(roomCode).emit('caseResolved', gameOverData);
+      console.log(`🔍 Accusation in room ${roomCode}: ${player.username} accused ${suspectName} - CORRECT`);
+      return;
+    }
+
+    room.accusationsRemaining = Math.max(0, room.accusationsRemaining - 1);
+    io.to(roomCode).emit('accusationUpdate', {
+      remaining: room.accusationsRemaining,
+      accused: suspectName,
+      accuser: player.username
+    });
+
+    console.log(`🔍 Accusation in room ${roomCode}: ${player.username} accused ${suspectName} - INCORRECT (${room.accusationsRemaining} remaining)`);
+
+    if (room.accusationsRemaining > 0) {
+      return;
+    }
+
     const gameOverData = {
-      won: isCorrect,
-      correctly_accused: isCorrect,
+      won: false,
+      correctly_accused: false,
       actual_killer: room.murderCase.killer,
       accused: suspectName,
       victim: room.murderCase.victim,
       accuser: player.username
     };
 
-    // End the investigation
     room.investigationStatus = 'concluded';
-    room.gameWon = isCorrect;
-    room.gameLost = !isCorrect;
+    room.gameWon = false;
+    room.gameLost = true;
 
-    // Broadcast to all players
     io.to(roomCode).emit('caseResolved', gameOverData);
-
-    console.log(`🔍 Accusation in room ${roomCode}: ${player.username} accused ${suspectName} - ${isCorrect ? 'CORRECT' : 'INCORRECT'}`);
   });
 
   // Collect evidence

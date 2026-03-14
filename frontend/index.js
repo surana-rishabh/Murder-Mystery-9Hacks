@@ -49,10 +49,10 @@ collisionsMap.forEach((row, i) => {
 });
 
 const image = new Image();
-image.src = "./img/calhacks-map.png";
+image.src = "./img/kajukatli-map.png";
 
 const foregroundImage = new Image();
-foregroundImage.src = "./img/calhacks-map-foreground.png";
+foregroundImage.src = "./img/kajukatli-map-foreground.png";
 
 const playerImage = new Image();
 playerImage.src = "./img/ninja.png";
