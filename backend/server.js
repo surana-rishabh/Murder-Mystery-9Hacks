@@ -19,7 +19,7 @@ app.use(express.json());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["http://localhost:5173", "http://localhost:5174", "https://murder-mystery-9-hacks-jm1x.vercel.app"],
     methods: ["GET", "POST"]
   }
 });
