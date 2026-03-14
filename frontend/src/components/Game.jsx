@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { socket } from './Lobby';
 import NPCChat from './NPCChat';
+import PlayerChat from './PlayerChat';
 import './Game.css';
 
 // Predefined suspect locations on the map
@@ -32,6 +33,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
   const [inventory, setInventory] = useState([]);
   const [gameOver, setGameOver] = useState(null);
   const [nearbyNPC, setNearbyNPC] = useState(null);
+  const [minimapState, setMinimapState] = useState({ player: { x: 0, y: 0 }, others: [] });
 
   // Murder mystery specific state
   const [murderCase, setMurderCase] = useState(null);
@@ -40,6 +42,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
   const [investigationActive, setInvestigationActive] = useState(false);
   const [notification, setNotification] = useState(null);
   const notificationTimeoutRef = useRef(null);
+  const evidenceFoundRef = useRef([]);
 
   // Refs to access current values without restarting animation loop
   const nearbyNPCRef = useRef(null);
@@ -78,6 +81,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
       delete gameStateRef.current.otherPlayers[socket.id];
       const inv = room.sharedInventory || [];
       setInventory(inv);
+      setEvidenceFound(room.evidenceFound || []);
       if (room.murderCase) {
         setMurderCase(room.murderCase);
         setSuspects(room.murderCase.suspects || []);
@@ -143,11 +147,13 @@ function Game({ roomCode, username, isHost, onLeave }) {
 
     socket.on('evidenceCollected', ({ evidenceName, collectedBy, totalEvidence }) => {
       console.log(`📋 Evidence collected: ${evidenceName} by ${collectedBy}`);
+      setEvidenceFound(prev => (prev.includes(evidenceName) ? prev : [...prev, evidenceName]));
       showNotification(`${collectedBy} collected: ${evidenceName}`);
     });
 
     socket.on('roomJoined', ({ roomCode, room }) => {
       setPlayers(room.players);
+      setEvidenceFound(room.evidenceFound || []);
       if (room.gameStarted) {
         setGameStarted(true);
         if (room.murderCase) {
@@ -171,6 +177,10 @@ function Game({ roomCode, username, isHost, onLeave }) {
       socket.off('evidenceCollected');
     };
   }, []);
+
+  useEffect(() => {
+    evidenceFoundRef.current = evidenceFound;
+  }, [evidenceFound]);
 
   // Check if player is near an NPC (using circle collision)
   const checkNPCProximity = (worldX, worldY) => {
@@ -208,7 +218,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
       );
 
       if (distance < zone.radius + 100) {
-        const isCollected = evidenceFound.includes(clue.name);
+        const isCollected = evidenceFoundRef.current.includes(clue.name);
         return {
           evidenceId: `clue_${i}`,
           name: clue.name,
@@ -223,13 +233,11 @@ function Game({ roomCode, username, isHost, onLeave }) {
   };
 
   const collectEvidence = (evidenceName) => {
-    if (evidenceFound.includes(evidenceName)) {
+    if (evidenceFoundRef.current.includes(evidenceName)) {
       showNotification('You already collected this evidence!');
       return;
     }
 
-    setEvidenceFound(prev => [...prev, evidenceName]);
-    showNotification(`📋 Collected: ${evidenceName}`);
     socket.emit('collectEvidence', { roomCode, evidenceName });
   };
 
@@ -546,7 +554,7 @@ function Game({ roomCode, username, isHost, onLeave }) {
           const screenX = centerX + state.background.x;
           const screenY = centerY + state.background.y;
 
-          const isCollected = evidenceFound.includes(zone.name);
+          const isCollected = evidenceFoundRef.current.includes(zone.name);
           const zoneColor = isCollected ? '#888888' : zone.color;
           const opacity = isCollected ? '20' : '50';
 
@@ -780,6 +788,29 @@ function Game({ roomCode, username, isHost, onLeave }) {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [gameStarted, roomCode, username]);
+
+  useEffect(() => {
+    if (!gameStarted) return;
+
+    const intervalId = setInterval(() => {
+      const state = gameStateRef.current;
+      const worldX = state.player.position.x - state.background.x;
+      const worldY = state.player.position.y - state.background.y;
+      const others = Object.values(state.otherPlayers || {}).map((player) => ({
+        id: player.id,
+        x: player.position?.x || 0,
+        y: player.position?.y || 0,
+        username: player.username
+      }));
+
+      setMinimapState({
+        player: { x: worldX, y: worldY },
+        others
+      });
+    }, 200);
+
+    return () => clearInterval(intervalId);
+  }, [gameStarted]);
 
   const handleStartGame = () => {
     socket.emit('startGame', { roomCode });
@@ -1016,7 +1047,45 @@ ${gameOver.victim} was killed via ${murderCase?.weapon || 'unknown method'} in $
         X: {gameStateRef.current?.player?.position?.x ? Math.floor(gameStateRef.current.player.position.x - gameStateRef.current.background.x) : 0}<br/>
         Y: {gameStateRef.current?.player?.position?.y ? Math.floor(gameStateRef.current.player.position.y - gameStateRef.current.background.y) : 0}
       </div>
+
+      <div className="minimap">
+        <div className="minimap-title">Estate Map</div>
+        <div className="minimap-area">
+          {SUSPECT_LOCATIONS.map((suspect, idx) => (
+            <div
+              key={`suspect-${idx}`}
+              className="minimap-marker minimap-suspect"
+              style={{
+                left: `${(suspect.x / 5760) * 100}%`,
+                top: `${(suspect.y / 5760) * 100}%`
+              }}
+              title={suspect.name}
+            />
+          ))}
+          {minimapState.others.map((player) => (
+            <div
+              key={player.id}
+              className="minimap-marker minimap-player"
+              style={{
+                left: `${(player.x / 5760) * 100}%`,
+                top: `${(player.y / 5760) * 100}%`
+              }}
+              title={player.username}
+            />
+          ))}
+          <div
+            className="minimap-marker minimap-me"
+            style={{
+              left: `${(minimapState.player.x / 5760) * 100}%`,
+              top: `${(minimapState.player.y / 5760) * 100}%`
+            }}
+            title={username}
+          />
+        </div>
+      </div>
       <canvas ref={canvasRef} />
+
+      <PlayerChat socket={socket} roomCode={roomCode} username={username} />
 
       {(() => {
           if (!activeNPC || !suspects || suspects.length === 0) return null;

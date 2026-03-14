@@ -29,12 +29,66 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GROQ_API_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
+// ElevenLabs TTS Configuration
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
+const ELEVENLABS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+
 // JLLM API Configuration
 const JLLM_API_ENDPOINT = "https://janitorai.com/hackathon/completions";
 const JLLM_API_KEY = "calhacks2047";
 
 // Store game rooms
 const rooms = new Map();
+
+app.post('/tts', async (req, res) => {
+  try {
+    const { text, voiceId, modelId } = req.body || {};
+    if (!ELEVENLABS_API_KEY) {
+      return res.status(500).json({ message: 'ElevenLabs API key missing' });
+    }
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ message: 'Text is required' });
+    }
+
+    const trimmed = text.trim().slice(0, 500);
+    if (!trimmed) {
+      return res.status(400).json({ message: 'Text is empty' });
+    }
+
+    const chosenVoiceId = voiceId || ELEVENLABS_VOICE_ID;
+    const chosenModelId = modelId || ELEVENLABS_MODEL_ID;
+
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${chosenVoiceId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVENLABS_API_KEY
+      },
+      body: JSON.stringify({
+        text: trimmed,
+        model_id: chosenModelId,
+        voice_settings: {
+          stability: 0.4,
+          similarity_boost: 0.7
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ message: errorText || 'TTS request failed' });
+    }
+
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.send(audioBuffer);
+  } catch (error) {
+    console.error('TTS error:', error.message);
+    res.status(500).json({ message: 'TTS error' });
+  }
+});
 
 
 // Generate a murder mystery case using AI
@@ -358,6 +412,8 @@ io.on('connection', (socket) => {
       accusation: null
     };
 
+    room.playerChat = [];
+
     rooms.set(roomCode, room);
     socket.join(roomCode);
     socket.emit('roomCreated', { roomCode, room });
@@ -390,6 +446,39 @@ io.on('connection', (socket) => {
     socket.emit('roomJoined', { roomCode, room });
     io.to(roomCode).emit('playerJoined', { playerId: socket.id, player: room.players[socket.id] });
     console.log(`${username} joined room ${roomCode}`);
+  });
+
+  socket.on('enterPlayerChat', ({ roomCode }) => {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+
+    socket.emit('playerChatHistory', {
+      messages: room.playerChat || []
+    });
+  });
+
+  socket.on('sendPlayerChatMessage', ({ roomCode, message }) => {
+    if (!message || !message.trim()) return;
+    const room = rooms.get(roomCode);
+    if (!room) return;
+
+    const player = room.players[socket.id];
+    if (!player) return;
+
+    const chatMessage = {
+      id: `${Date.now()}-${Math.random()}`,
+      sender: player.username,
+      message: message.trim().slice(0, 500),
+      timestamp: Date.now()
+    };
+
+    if (!room.playerChat) room.playerChat = [];
+    room.playerChat.push(chatMessage);
+    if (room.playerChat.length > 50) {
+      room.playerChat = room.playerChat.slice(-50);
+    }
+
+    io.to(roomCode).emit('playerChatMessage', chatMessage);
   });
 
   // Start game

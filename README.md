@@ -13,7 +13,7 @@ A real-time multiplayer game built with React and Socket.IO, featuring Among Us-
 ## Project Structure
 
 ```
-calhacks12/
+kajukatli/
 ├── backend/
 │   ├── server.js          # Socket.IO server
 │   └── package.json
@@ -30,8 +30,8 @@ calhacks12/
 │   │   └── index.css
 │   ├── public/
 │   │   ├── img/
-│   │   │   ├── calhacks-map.png
-│   │   │   ├── calhacks-map-foreground.png
+│   │   │   ├── kajukatli-map.png
+│   │   │   ├── kajukatli-map-foreground.png
 │   │   │   └── ninja.png
 │   │   └── data/
 │   │       └── collisions.js
@@ -179,3 +179,4 @@ The frontend uses:
 ## License
 
 MIT License - Feel free to use this project for learning and fun!
+# Murder-Mystery-9Hacks

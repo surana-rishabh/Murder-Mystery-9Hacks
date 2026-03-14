@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { playTTS } from '../utils/tts';
 import './NPCChat.css';
 
 function NPCChat({ socket, roomCode, npcId, npcName, location, onClose, username }) {
@@ -72,6 +73,10 @@ function NPCChat({ socket, roomCode, npcId, npcName, location, onClose, username
           console.log('📊 Total messages after update:', updated.length);
           return updated;
         });
+
+        if (isNPC) {
+          playTTS(message);
+        }
       } else {
         console.log('❌ Message not for this NPC, ignoring');
       }

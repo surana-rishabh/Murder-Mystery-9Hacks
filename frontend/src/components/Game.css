@@ -181,6 +181,59 @@
   line-height: 1.4;
 }
 
+.minimap {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  width: 200px;
+  background: rgba(8, 12, 18, 0.9);
+  border: 1px solid #1f2937;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 900;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.minimap-title {
+  padding: 8px 10px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #39ff14;
+  border-bottom: 1px solid #1f2937;
+}
+
+.minimap-area {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  background-image: url('/img/calhacks-map.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.minimap-marker {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.minimap-me {
+  background: #39ff14;
+  box-shadow: 0 0 6px rgba(57, 255, 20, 0.8);
+}
+
+.minimap-player {
+  background: #f4d03f;
+  box-shadow: 0 0 6px rgba(244, 208, 63, 0.8);
+}
+
+.minimap-suspect {
+  background: #ff1744;
+  box-shadow: 0 0 6px rgba(255, 23, 68, 0.8);
+}
+
 .interaction-prompt {
   background: rgba(0, 0, 0, 0.8);
   border: 1px solid var(--accent-primary);
